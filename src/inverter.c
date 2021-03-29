@@ -55,10 +55,15 @@ static MenuItem_t _modeMenu[] = {
 	{13, 0, NULL, 					TempMinus, TempPlus, NULL }  // Antifrezee
 };
 
+//power mode
+static MenuItem_t _powerMode[] = {
+	{211, 0, NULL, 					NULL, NULL, NULL}, // Auto
+	{212, 5, NULL, 					NULL, NULL, NULL}, // Custom
+};
 // Power menu
 static MenuItem_t _powerMenu[] = {
-	{21, 0, NULL, 					NULL, NULL, NULL}, // Auto
-	{22, 5, NULL, 					NULL, NULL, NULL}, // Custom
+	{21, 2, _powerMode, 		NULL, NULL, NULL},
+	{22, 0, NULL, 					On, Off, NULL }, 
 };
 
 // Date&time menu
@@ -343,13 +348,21 @@ void DrawMenu()
 			text = "Anti-frost";
 			break;
 		case 21:
+			icon = img_menu_power_icon_png_comp;
+			text = "Power mode";
+			break;			
+		case 22:
+			icon = img_power_limit_png_comp;
+			text = "Power limit";
+			break;		
+		case 211:
 			icon = img_menu_power_auto_icon_png_comp;	
 			text = "Auto";
 			break;
-		case 22:
+		case 212:
 			icon = img_menu_power_custom_icon_png_comp;
 			text = "Custom";
-			break;
+			break;			
 		case 31:
 			icon = _settings.timerOn ? img_menu_timer_on_png_comp : img_menu_timer_off_png_comp;
 			text = _settings.timerOn ? "Timer is on" : "Timer is off";
@@ -562,7 +575,7 @@ void MenuOK()
 	if (currentMenu->ID == 5)
 	{
 		rtc_current_time_get(&rtc_initpara); 
-		if ((bcdToDec(rtc_initpara.rtc_year) <= 19) && (bcdToDec(rtc_initpara.rtc_month) < 12))
+		if ((bcdToDec(rtc_initpara.rtc_year) <= 20) && (bcdToDec(rtc_initpara.rtc_month) < 12))
 		{
 			old = currentMenu->parent;
 			currentMenu = &_settingsMenu[0];
@@ -721,7 +734,7 @@ void DrawEditParameter()
 			DrawLeftRight();
 			DrawTemperature(_tempConfig.desired, -25, 15);
 			break;
-		case 22: // power custom
+		case 212: // power custom
 			DrawMenuText("Power level");
 
 			width = (currentMenu->selected + 1) * 12 + currentMenu->selected * 20;
@@ -746,6 +759,7 @@ void DrawEditParameter()
 			DrawTextAligment( 20, 70, 100, 100,  "ON",  _onoffSet.parameter, _onoffSet.current,0, MAIN_COLOR, BG_COLOR );
 			DrawTextAligment(200, 70, 100, 100, "OFF", !_onoffSet.parameter,!_onoffSet.current,0, MAIN_COLOR, BG_COLOR );				
 			break;
+		case 22:
 		case 421:
 			pxs.setFont(ElectroluxSansRegular36a);
 			DrawTextAligment( 20, 60, 120, 120, "50%",  _onoffSet.parameter,0,0, MAIN_COLOR, BG_COLOR );
@@ -785,6 +799,12 @@ void DrawEditParameter()
 		
 			width = pxs.getTextWidth(buffer);
 			DrawTextAligment(0, 115, 320, 60, buffer, false);		
+		
+			pxs.setFont(ElectroluxSansRegular17a);
+		  sprintf(buffer, "%s%s   %s%s", "PMU ", VERSION_PMU, "MCU ", VERSION_MCU);
+			width = pxs.getTextWidth(buffer);
+			DrawTextAligment(0, 190, 320, 60, buffer, false);		
+		
 			break;	
 		case 51:
 		  rtc_current_time_get(&rtc_initpara);
@@ -915,13 +935,17 @@ void PrepareEditParameter()
 			_tempConfig.min = 3;
 			_tempConfig.max = 7;
 			break;
-		case 21: // power auto
+		case 211: // power auto
 			AcceptParameter();
 			return;
 			//break;
-		case 22: // power custom
+		case 212: // power custom
 			currentMenu->selected = _settings.powerLevel - 1;
 			break;
+		case 22:
+			_onoffSet.current = _settings.half_power;
+			_onoffSet.parameter = _settings.half_power;
+			break;		
 		case 31: // timer on/off
 			_onoffSet.current = _settings.timerOn;
 			_onoffSet.parameter = _settings.timerOn;
@@ -999,17 +1023,26 @@ void AcceptParameter()
 			_settings.tempAntifrost = _tempConfig.desired;
 			GoOK();
 			break;
-		case 21: // power auto
+		case 211: // power auto
 			_settings.heatMode = HeatMode_Auto;
 		  power_limit = 20;
 			GoOK(2);
 			break;
-		case 22: // power custom
+		case 212: // power custom
 			_settings.heatMode = HeatMode_User;
 		  _settings.calendarOn = 0;
+			_settings.half_power = 0;
 			_settings.powerLevel = currentMenu->selected + 1;
 			GoOK(2);
 			break;
+		case 22:
+			_settings.half_power = _onoffSet.parameter;
+			if(_settings.half_power)
+			{
+				_settings.heatMode = HeatMode_Auto;
+			}
+			GoOK();
+			break;		
 		case 31:
 			_settings.timerOn = _onoffSet.parameter;
 		  if(_settings.timerOn)
@@ -1842,15 +1875,18 @@ int8_t getTemperature()
 void DrawWindowOpen()
 {
 	_stateBrightness = StateBrightness_ON;
-	smooth_backlight(1);
 	if (_timerBlink < GetSystemTick())
 	{
 		_blink = !_blink;
-		_timerBlink = GetSystemTick() + 500;
+		_timerBlink = GetSystemTick() + 1000;
 
+		smooth_backlight(0);
 		pxs.clear();
 		if (_blink)
+		{
 			pxs.drawCompressedBitmap(100, 64, (uint8_t*)img_WindowOpen_png_comp);
+			smooth_backlight(1);
+		}
 	}
 }
 
@@ -2127,12 +2163,12 @@ void DrawMainScreen(uint32_t updater)
 
 	if(_settings.half_power)
 	{
-		pxs.drawCompressedBitmap(70, 183, (uint8_t*)img_icon_half_png_comp);
+		pxs.drawCompressedBitmap(74, 183, (uint8_t*)img_icon_half_png_comp);
 	}
 	else
 	{
 		pxs.setColor(BG_COLOR);
-		pxs.fillRectangle(70, 183, 11, 16);
+		pxs.fillRectangle(74, 183, 11, 16);
 	}
 	
 	if (_settings.workMode != WorkMode_Off)
@@ -2180,20 +2216,18 @@ void DrawMainScreen(uint32_t updater)
 				if(i < 2) 
 				{
 					pxs.setColor(powerLevelColors[0]);
-					pxs.fillRectangle(8, 213, i ? 53 : 26, 12);
+					pxs.fillRectangle(22, 205, i ? 49 : 26, 12);
 				}
 				else if((i >= 2) && (i < 4)) 
 				{
 					pxs.setColor(powerLevelColors[1]);
-					pxs.fillRectangle(11 + 1 * 53 + 1 * 8, 213, i == 3 ? 53 : 26, 12);
+					pxs.fillRectangle(22 + 1 * 49 + 1 * 8, 205, i == 3 ? 49 : 26, 12);
 				}
 				else 
 				{
 					pxs.setColor(powerLevelColors[2]);
-					pxs.fillRectangle(11 + 2 * 53 + 2 * 8, 213, 26, 12);
-				}
-				
-				//pxs.fillRectangle(11 + i * 53 + i * 8, 213, 53, 12);
+					pxs.fillRectangle(22 + 2 * 49 + 2 * 8, 205, 26, 12);
+				}	
 			}			
 		}
 		else
@@ -2438,6 +2472,7 @@ void startScreen()
   smooth_backlight(1);
 	delay_1ms(2000);
 	smooth_backlight(0);
+	
 	currentMenu = NULL;
 	nextChangeLevel = 0;
 	if (_settings.calendarOn == 1)
@@ -3027,7 +3062,6 @@ void loop(void)
 		if(refresh_system)
 		{
 			idleTimeout = GetSystemTick();
-			query_settings();
 		}
 		// auto switch off
 		if (_settings.displayAutoOff && !_error && !window_is_opened)
@@ -3267,17 +3301,17 @@ void loop(void)
 									if(i < 2) 
 									{
 										pxs.setColor(powerLevelColors[0]);
-										pxs.fillRectangle(8, 213, i ? 53 : 26, 12);
+										pxs.fillRectangle(22, 205, i ? 49 : 26, 12);
 									}
 									else if((i >= 2) && (i < 4)) 
 									{
 										pxs.setColor(powerLevelColors[1]);
-										pxs.fillRectangle(11 + 1 * 53 + 1 * 8, 213, i == 3 ? 53 : 26, 12);
+										pxs.fillRectangle(22 + 1 * 49 + 1 * 8, 205, i == 3 ? 49 : 26, 12);
 									}
 									else 
 									{
 										pxs.setColor(powerLevelColors[2]);
-										pxs.fillRectangle(11 + 2 * 53 + 2 * 8, 213, 26, 12);
+										pxs.fillRectangle(22 + 2 * 49 + 2 * 8, 205, 26, 12);
 									}
 								}
 								else
@@ -3285,21 +3319,20 @@ void loop(void)
 									pxs.setColor(BG_COLOR);
 									if(i < 2) 
 									{
-										pxs.fillRectangle(i ? 8+26 : 8, 213, 27, 12);
-
+										pxs.fillRectangle(i ? 22+26 : 22, 205, 27, 12);
 									}
 									else if((i >= 2) && (i < 4)) 
 									{
-										pxs.fillRectangle(i==3 ? 72+26 : 72, 213, 27, 12);
-
+										pxs.fillRectangle(i==3 ? 79+26 : 79, 205, 27, 12);
 									}
 									else 
 									{
-										pxs.fillRectangle(11 + 2 * 53 + 2 * 8, 213, 27, 12);
+										pxs.fillRectangle(22 + 2 * 49 + 2 * 8, 205, 27, 12);
 									}									
 								}
 							}			
-						}
+						}			
+						
 						else
 						{
 							for (int i = 0; i < 5; i++)
@@ -3321,9 +3354,11 @@ void loop(void)
 				{
 					idleTimeout = GetSystemTick();
 					refresh_system = false;
+					query_settings();
 				}
 				else
 				{
+					query_settings();
 					nextChangeLevel = GetSystemTick() + 60000;			
 				}					
 			}
@@ -3336,7 +3371,7 @@ void loop(void)
 						
 			if (currentMenu == NULL && !_error)
 			{
-				#ifdef DEBUG
+			#ifdef DEBUG	
 				char buffer[10];
 				pxs.setColor(BG_COLOR);
 				pxs.fillRectangle(240, 20, 75, 20);

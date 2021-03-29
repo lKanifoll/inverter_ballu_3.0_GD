@@ -139,7 +139,7 @@ void receive_uart_int()
 				{
 					if(device_cmd == ID_QUERY)
 					{ 
-						query_settings();						
+						query_settings(0);						
 					}
 					else
 					{
@@ -512,7 +512,7 @@ void query_faults()
 	*/
 }
 
-void query_settings()
+void query_settings(bool self)
 {
 	
 	answer_frame.clear();
@@ -520,7 +520,7 @@ void query_settings()
 	answer_frame.put(HEADER_1B);
 	answer_frame.put(HEADER_2B);
 	answer_frame.put(cmd_ver);
-	//msq_num++;
+	self ? msq_num++ : msq_num;
 	answer_frame.put(msq_num>>24);
 	answer_frame.put(msq_num>>16);
 	answer_frame.put(msq_num>>8);
@@ -529,7 +529,7 @@ void query_settings()
 	answer_frame.put(device_cmd);					
 	answer_frame.put(CMD_OUTPUT);
 	answer_frame.put(0x00);
-	answer_frame.put(0x6E);
+	answer_frame.put(0x72);
 	
 	//switch
 	answer_frame.put(ID_SWITCH);
