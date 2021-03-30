@@ -10,6 +10,7 @@ extern void DrawMainScreen(uint32_t updater);
 extern void deviceOFF();
 extern void deviceON();
 
+extern uint8_t power_limit;
 extern bool refresh_system;
 extern struct DeviceSettings _settings;
 extern uint8_t power_level_auto;	
@@ -158,7 +159,7 @@ void receive_uart_int()
 						answer_frame.put(payload_len>>8);
 						answer_frame.put(payload_len);
 						answer_frame.put_str(payload, payload_len);
-						answer_frame.put32(crc_calc);
+						answer_frame.put32(calc_crc32(answer_frame.sptr(), answer_frame.count()));
 						
 						usart_transmit_frame(answer_frame.sptr(), answer_frame.count());
 						
@@ -288,6 +289,10 @@ void receive_uart_int()
 									_settings.calendarOn = 0;
 									_settings.workMode = WorkMode_Comfort;
 								}
+								else
+								{
+									power_limit = 20;
+								}
 								DrawMainScreen();
 								refresh_system = true;								
 							}			
@@ -347,7 +352,7 @@ void receive_uart_int()
 								DrawMainScreen();
 								refresh_system = true;
 							}		
-							query_settings();
+							//query_settings();
 						}				
 						
 						if(device_cmd == ID_TIMERTIME)
@@ -423,6 +428,7 @@ void receive_uart_int()
 				}
 				delete []payload;	
 				delete []crc_calc_data;
+				if(device_cmd != ID_QUERY) _timeoutSaveFlash = GetSystemTick() + SAVE_TIMEOUT;
 			}
 			pointer++;
 		}
@@ -430,7 +436,6 @@ void receive_uart_int()
 		rxcount = 0;
 		//i = 0;
 		idle_flag_stat = 0;
-		_timeoutSaveFlash = GetSystemTick() + SAVE_TIMEOUT;
 	}
 }
 
@@ -525,8 +530,8 @@ void query_settings(bool self)
 	answer_frame.put(msq_num>>16);
 	answer_frame.put(msq_num>>8);
 	answer_frame.put(msq_num);
-	answer_frame.put(device_cmd>>8);
-	answer_frame.put(device_cmd);					
+	answer_frame.put(0x00);
+	answer_frame.put(0xFF);					
 	answer_frame.put(CMD_OUTPUT);
 	answer_frame.put(0x00);
 	answer_frame.put(0x72);

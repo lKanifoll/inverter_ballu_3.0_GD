@@ -2579,7 +2579,7 @@ void deviceOFF()
 	smooth_backlight(0);
 	pxs.displayOff();
 	pxs.clear();
-	query_settings();
+	//query_settings();
 	//InitTimer();
 	_timeoutSaveFlash = GetSystemTick();
 }
@@ -2644,7 +2644,7 @@ bool keyPressed()
 	  }
 	}
 	
-	nextChangeLevel = GetSystemTick() + 5000;
+	nextChangeLevel = GetSystemTick() + 2000;
 	return result;	
 	
 }
@@ -3354,7 +3354,7 @@ void loop(void)
 				{
 					idleTimeout = GetSystemTick();
 					refresh_system = false;
-					query_settings();
+					//query_settings();
 				}
 				else
 				{
