@@ -21,6 +21,10 @@ extern uint32_t idleTimeout;
 extern uint32_t _timeoutSaveFlash;
 extern uint8_t _error;
 extern bool window_is_opened;
+extern int8_t temp_current_ext;	
+extern uint8_t cutoff_ext_temp;
+extern uint32_t wifi_active;
+
 uint8_t rxcount = 0;
 uint8_t idle_count = 0;
 uint32_t crc = 0, crc_calc = 0;
@@ -28,7 +32,7 @@ uint8_t answer_cmd[50] = {0x55, 0xAA, 0x03};
 uint8_t answer_cmd1[50] = {0x55, 0xAA, 0x03};
 extern uint8_t wifi_status;
 uint8_t idle_flag_stat = 0;	
-uint8_t recv_buffer[200];
+uint8_t recv_buffer[51];
 void receive_uart_int(void);
 uint8_t answer_out[300];
 Stream answer_frame(answer_out, 300);
@@ -73,7 +77,7 @@ uint32_t calc_crc32(uint8_t * data, uint32_t size)
 uint32_t ntohl(uint32_t net) 
 {
     uint8_t data[4] = {};
-    memcpy(&data, &net, sizeof(data));
+    memcpy(&data, &net, 4);
 
     return ((uint32_t) data[3] << 0)
          | ((uint32_t) data[2] << 8)
@@ -107,7 +111,7 @@ void receive_uart_int()
 {
 	if(idle_flag_stat)
 	{
-    uint16_t pointer 			= 0;
+    uint16_t pointer = 0;
 
 		crc_calc = 0;
 		
@@ -115,7 +119,7 @@ void receive_uart_int()
 		{
 			if(recv_buffer[pointer] == HEADER_1B && recv_buffer[pointer+1] == HEADER_2B) // FIND HEADER ACBD
 			{
-				
+				usart_interrupt_disable(USART1, USART_INT_RBNE);
 				cmd_ver 		= 	recv_buffer[pointer + 2];
 				msq_num			=	((recv_buffer[pointer + 3]      << 24) | (recv_buffer[pointer + 4]      << 16) | (recv_buffer[pointer + 5]     << 8)  | recv_buffer[pointer + 6]);
 				device_cmd  = ( recv_buffer[pointer + 7]      << 8)  +  recv_buffer[pointer + 8];
@@ -161,7 +165,7 @@ void receive_uart_int()
 						answer_frame.put_str(payload, payload_len);
 						answer_frame.put32(calc_crc32(answer_frame.sptr(), answer_frame.count()));
 						
-						usart_transmit_frame(answer_frame.sptr(), answer_frame.count());
+						if(((_error == 0 && !window_is_opened) || ((_error == 0 && window_is_opened && device_cmd == ID_OPENWINDOW))) || (_error != 0 && device_cmd == ID_SWITCH)) usart_transmit_frame(answer_frame.sptr(), answer_frame.count());
 						
 						
 						if(device_cmd == ID_SWITCH)
@@ -179,13 +183,35 @@ void receive_uart_int()
 							}
 						}
 						
+						if(_error != 0) break;
+
+						if(device_cmd == ID_OPENWINDOW)
+						{
+							uint8_t open_window = payload[0];
+							if(window_is_opened)
+							{
+								open_window_func();
+							}
+							else if(_settings.modeOpenWindow != open_window)
+							{
+								_settings.modeOpenWindow = open_window;	
+							}			
+							DrawMainScreen(0);
+							refresh_system = true;			
+						}
+
+						if(window_is_opened) break;
+						
 						if(device_cmd == ID_WORKMODE)
 						{
 							uint8_t workmode = payload[0];
-							
-							_settings.workMode = (WorkMode)workmode;
-							DrawMainScreen();
-							refresh_system = true;
+							if(_settings.workMode != workmode)
+							{
+								_settings.workMode = (WorkMode)workmode;
+								_settings.calendarOn = 0;
+								DrawMainScreen();
+								refresh_system = true;
+							}
 						}			
 						
 						if(device_cmd == ID_CHILDLOCK)
@@ -204,56 +230,8 @@ void receive_uart_int()
 							if(_settings.brightness != bright)
 							{
 								_settings.brightness = bright;
-								if (_settings.brightness)
-								{
-									_stateBrightness = StateBrightness_ON;
-								}
-								else
-								{
-									_stateBrightness = StateBrightness_LOW;
-								}
-								//if(!_settings.displayAutoOff)
-								{
-									smooth_backlight(1);
-								}
-							}			
-						}		
-						
-						if(device_cmd == ID_COMFORT)
-						{
-							uint8_t temp = payload[0];
-							if(_settings.workMode == WorkMode_Eco) CleanTemperature(_settings.tempComfort - _settings.tempEco,0,0);	
-							if(_settings.workMode == WorkMode_Comfort) CleanTemperature(_settings.tempComfort,0,0);	
-							_settings.tempComfort = temp;
-							DrawMainScreen(1);
-							refresh_system = true;
-						}	
-
-						if(device_cmd == ID_ECO)
-						{
-							uint8_t temp = payload[0];
-							if(_settings.workMode == WorkMode_Eco) CleanTemperature(_settings.tempComfort - _settings.tempEco,0,0);	
-							_settings.tempEco = temp;
-							DrawMainScreen(1);
-							refresh_system = true;
-						}
-
-						if(device_cmd == ID_ANTIFR)
-						{
-							uint8_t temp = payload[0];
-							if(_settings.workMode == WorkMode_Antifrost) CleanTemperature(_settings.tempAntifrost,0,0);	
-							_settings.tempAntifrost = temp;
-							DrawMainScreen(1);
-							refresh_system = true;
-						}		
-
-						if(device_cmd == ID_LCDOFF)
-						{							
-							uint8_t lcdoff = payload[0];
-							if(_settings.displayAutoOff != lcdoff)
-							{
-								_settings.displayAutoOff = lcdoff;
-								if(!_settings.displayAutoOff)
+								
+								//if(_stateBrightness != StateBrightness_OFF)
 								{
 									if (_settings.brightness)
 									{
@@ -263,9 +241,59 @@ void receive_uart_int()
 									{
 										_stateBrightness = StateBrightness_LOW;
 									}
+									idleTimeout = GetSystemTick(); 
 									smooth_backlight(1);
-								}		
-							 idleTimeout = GetSystemTick(); 								
+							  }
+							}			
+						}	
+						
+						if(device_cmd == ID_CURRTEMP)
+						{
+							temp_current_ext = (payload[0] << 8) | payload[1];
+							cutoff_ext_temp = 2;
+							refresh_system = true;
+						}
+						
+						if(device_cmd == ID_COMFORT)
+						{
+							uint8_t temp = payload[0];
+							_settings.tempComfort = temp;
+							DrawMainScreen();
+							refresh_system = true;
+						}	
+
+						if(device_cmd == ID_ECO)
+						{
+							uint8_t temp = payload[0];
+							_settings.tempEco = temp;
+							DrawMainScreen();
+							refresh_system = true;
+						}
+
+						if(device_cmd == ID_ANTIFR)
+						{
+							uint8_t temp = payload[0];
+							_settings.tempAntifrost = temp;
+							DrawMainScreen(0);
+							refresh_system = true;
+						}		
+
+						if(device_cmd == ID_LCDOFF)
+						{							
+							uint8_t lcdoff = payload[0];
+							if(_settings.displayAutoOff != lcdoff)
+							{
+								_settings.displayAutoOff = lcdoff;
+									if (_settings.brightness)
+									{
+										_stateBrightness = StateBrightness_ON;
+									}
+									else
+									{
+										_stateBrightness = StateBrightness_LOW;
+									}
+									idleTimeout = GetSystemTick(); 
+									smooth_backlight(1);
 							}			
 						}
 
@@ -287,6 +315,7 @@ void receive_uart_int()
 								if(_settings.heatMode == HeatMode_User)
 								{
 									_settings.calendarOn = 0;
+									_settings.half_power = 0;
 									_settings.workMode = WorkMode_Comfort;
 								}
 								else
@@ -294,20 +323,12 @@ void receive_uart_int()
 									power_limit = 20;
 								}
 								DrawMainScreen();
-								refresh_system = true;								
+								refresh_system = true;
 							}			
 						}		
 						
-						if(device_cmd == ID_OPENWINDOW)
-						{
-							uint8_t open_window = payload[0];
-							if(_settings.modeOpenWindow != open_window)
-							{
-								_settings.modeOpenWindow = open_window;
-								DrawMainScreen();
-								refresh_system = true;								
-							}			
-						}
+												  
+
 
 						if(device_cmd == ID_TIMER)
 						{
@@ -352,7 +373,6 @@ void receive_uart_int()
 								DrawMainScreen();
 								refresh_system = true;
 							}		
-							//query_settings();
 						}				
 						
 						if(device_cmd == ID_TIMERTIME)
@@ -419,16 +439,46 @@ void receive_uart_int()
 						}
 
 						if(device_cmd == ID_WIFI)
-						{							
+						{	
+							wifi_active = GetSystemTick() + 60000;
 							wifi_status = payload[0];
-						}						
+						}
 						
-						refresh_mainscreen();
+						if(device_cmd == ID_HALF_P)
+						{							
+							uint8_t half_p = payload[0];
+							if(_settings.half_power != half_p)
+							{
+								_settings.half_power = half_p;
+								DrawMainScreen();
+								refresh_system = true;
+							}	
+
+						}
+						
+						//refresh_mainscreen();
 					}
 				}
+				if((device_cmd != ID_QUERY) && (device_cmd != ID_WIFI) && (device_cmd != ID_CURRTEMP)) 
+				{
+					_timeoutSaveFlash = GetSystemTick() + SAVE_TIMEOUT;
+					if((_settings.displayAutoOff) && (device_cmd != ID_BRIGHT) && (device_cmd != ID_LCDOFF))
+					{
+						if (_settings.brightness)
+						{
+							_stateBrightness = StateBrightness_ON;
+						}
+						else
+						{
+							_stateBrightness = StateBrightness_LOW;
+						}
+						smooth_backlight(1);
+				  } 
+			    idleTimeout = GetSystemTick();					
+				}				
 				delete []payload;	
 				delete []crc_calc_data;
-				if(device_cmd != ID_QUERY) _timeoutSaveFlash = GetSystemTick() + SAVE_TIMEOUT;
+				
 			}
 			pointer++;
 		}
@@ -436,6 +486,7 @@ void receive_uart_int()
 		rxcount = 0;
 		//i = 0;
 		idle_flag_stat = 0;
+		usart_interrupt_enable(USART1, USART_INT_RBNE);
 	}
 }
 
@@ -519,7 +570,7 @@ void query_faults()
 
 void query_settings(bool self)
 {
-	
+
 	answer_frame.clear();
 	answer_frame.reset();
 	answer_frame.put(HEADER_1B);
@@ -534,7 +585,7 @@ void query_settings(bool self)
 	answer_frame.put(0xFF);					
 	answer_frame.put(CMD_OUTPUT);
 	answer_frame.put(0x00);
-	answer_frame.put(0x72);
+	answer_frame.put(0x76);
 	
 	//switch
 	answer_frame.put(ID_SWITCH);
@@ -566,7 +617,7 @@ void query_settings(bool self)
 	answer_frame.put(ID_CURPOWER);
 	answer_frame.put(0);
 	answer_frame.put(1);
-	answer_frame.put(power_level_auto);
+	answer_frame.put(_settings.heatMode ? _settings.powerLevel : power_level_auto);
 	//Remining time
 	answer_frame.put(ID_REMTIME);
 	answer_frame.put(0);	
@@ -668,6 +719,11 @@ void query_settings(bool self)
 	answer_frame.put(0);
 	answer_frame.put(1);
 	answer_frame.put(window_is_opened);
+	//half power
+	answer_frame.put(ID_HALF_P);	
+	answer_frame.put(0);
+	answer_frame.put(1);
+	answer_frame.put(_settings.half_power);	
   //Firmware	
 	answer_frame.put(ID_FIRMWARE);	
 	answer_frame.put(0);
@@ -681,5 +737,5 @@ void query_settings(bool self)
 	crc_calc = calc_crc32(answer_frame.sptr(), answer_frame.count());
 	answer_frame.put32(crc_calc);
 	usart_transmit_frame(answer_frame.sptr(), answer_frame.count());
-	
+
 }

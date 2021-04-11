@@ -40,9 +40,9 @@ extern "C" {
 #define ID_CUSTOM_H		0x27
 #define ID_UDID    		0x29
 #define ID_DET_OW    	0x2A
-#define ID_WIFI				0x2B
-
-#define ID_QUERY			0xFF
+#define ID_WIFI				0x002B
+#define ID_HALF_P			0x2C
+#define ID_QUERY			0x00FF
 	
 
 

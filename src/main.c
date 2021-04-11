@@ -57,7 +57,7 @@ uint32_t valcrc0 = 0, valcrc1 = 0;
 uint8_t arr8[15] = {0xab, 0xcd, 0x12, 0x34, 0x34, 0x56, 0xcd, 0xef, 0x78, 0x9a, 0x15, 0x24, 0x12, 0x34, 0x12};
 //uint8_t arr8[16] = {0x34, 0x12, 0xcd, 0xab, 0xef, 0xcd, 0x56, 0x34, 0x24, 0x15, 0x9a, 0x78, 0x34, 0x12, 0x34, 0x12};
 uint32_t arr32[4] = {0xabcd1234, 0x3456cdef, 0x789a1524, 0x12341200};
-
+uint8_t hhhhh;
 int main(void)
 {
 	systick_config();
@@ -80,7 +80,6 @@ int main(void)
 	
 	RTC_config();
 	delay_1ms(500);
-	
 	
   loop();
 }
@@ -161,7 +160,7 @@ void gpio_config(void)
     gpio_af_set(GPIOA, GPIO_AF_1, GPIO_PIN_3);
     gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_2);
     gpio_output_options_set(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_2);
-    gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO_PIN_3);
+    gpio_mode_set(GPIOA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO_PIN_3);
     gpio_output_options_set(GPIOA, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_3);		
 
 }
@@ -220,8 +219,9 @@ void uart_init(void)
 		usart_stop_bit_set(USART1,USART_STB_1BIT);
     usart_receive_config(USART1, USART_RECEIVE_ENABLE);
     usart_transmit_config(USART1, USART_TRANSMIT_ENABLE);
-    usart_dma_receive_config(USART1, USART_DENR_ENABLE);
+    //usart_dma_receive_config(USART1, USART_DENR_ENABLE);
 		usart_baudrate_set(USART1, 9600U);
+	  usart_overrun_disable(USART1);
 	  //usart_halfduplex_enable(USART1);
     usart_enable(USART1);
 	

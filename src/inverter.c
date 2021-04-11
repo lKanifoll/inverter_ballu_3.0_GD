@@ -135,7 +135,12 @@ uint32_t idleTimeout = 0;
 
 uint8_t _currentPower = 0;
 uint8_t semistor_power = 0;
+	
 int8_t temp_current	= 0;
+int8_t temp_current_ext	= 0;	
+uint8_t cutoff_ext_temp = 0;
+uint32_t wifi_active = 0;	
+	
 uint8_t power_level_auto = 0;	
 uint8_t powerback_flag = 0;
 uint8_t _currentPowerTicks = 20;
@@ -147,7 +152,7 @@ uint8_t _eventTimer = 0;
 uint8_t _blocked = 0;
 uint32_t _durationClick = 0;
 uint32_t _timeoutSaveFlash = 0;
-
+uint8_t menu_clear_flag=0;
 uint8_t _error = 0;
 uint8_t _error_fl = 0;
 int16_t _xWifi;
@@ -246,6 +251,7 @@ void smooth_backlight(uint8_t mode)
 {
 	if(mode)
 	{
+		
 		for(uint16_t i=0;i<(_stateBrightness ? 100:500);i+=5)
 		{
 			timer_channel_output_pulse_value_config(TIMER1,TIMER_CH_0,i);
@@ -254,6 +260,7 @@ void smooth_backlight(uint8_t mode)
 	}
 	else
 	{
+		
 		for(uint16_t j=(_stateBrightness ? 100:500);j>0;j--)
 		{
 			timer_channel_output_pulse_value_config(TIMER1,TIMER_CH_0,j);
@@ -448,7 +455,7 @@ void DrawMenu()
 
 void MainScreen()
 {
-	
+	menu_clear_flag = 0;
 	currentMenu = NULL;
 	DrawMainScreen();
 		
@@ -578,8 +585,8 @@ void MenuOK()
 		if ((bcdToDec(rtc_initpara.rtc_year) <= 20) && (bcdToDec(rtc_initpara.rtc_month) < 12))
 		{
 			old = currentMenu->parent;
-			currentMenu = &_settingsMenu[0];
-			currentMenu->parent = old;
+			currentMenu = &_datetimeMenu[0];
+			currentMenu->parent = old;		
 		}
 	}
 
@@ -597,7 +604,7 @@ void GoOK(int step = 1)
 {
 	_timeoutSaveFlash = GetSystemTick();
 
-	if ((currentMenu->ID == 411) && (currentMenu->parent->parent->selected == 4))
+	if ((currentMenu->ID == 411) && (currentMenu->parent->selected == 4))
 	{
 		_modeOK.parent = currentMenu->parent;
 		currentMenu = &_datetimeMenu[1];
@@ -614,10 +621,11 @@ void GoOK(int step = 1)
 		pxs.print(320 / 2 - width/2-2, 240/2 - height/2, "OK");
 		pxs.setColor(MAIN_COLOR);
 		pxs.setBackground(BG_COLOR);
+		currentMenu->selected = 0;
 		smooth_backlight(1);
 		delay_1ms(2000);
 	}	
-	else if ((currentMenu->ID == 412) && (currentMenu->parent->parent->selected == 4))
+	else if ((currentMenu->ID == 412) && (currentMenu->parent->selected == 4))
 	{
 		_modeOK.parent = currentMenu->parent;
 		currentMenu = &_mainMenu[4];
@@ -704,8 +712,15 @@ void DrawEditParameter()
 	char buf[30];
 	
 	struct Presets* _pr = NULL;
-	if(!(currentMenu->ID == 11 || currentMenu->ID == 12 || currentMenu->ID == 13))
-		pxs.clear();
+	if(!(currentMenu->ID == 11 || currentMenu->ID == 12 || currentMenu->ID == 13 ))
+	{
+		if(menu_clear_flag == 0)
+		{
+			pxs.clear();
+		}
+		if(currentMenu->ID == 411 || currentMenu->ID == 412 || currentMenu->ID == 421 || currentMenu->ID == 52 || 
+			 currentMenu->ID == 31 || currentMenu->ID == 43 || currentMenu->ID == 422 || currentMenu->ID == 22 || currentMenu->ID == 32 || currentMenu->ID == 441) menu_clear_flag = 1;
+	}
   int16_t width; 
   int16_t height;	
 	switch (currentMenu->ID)
@@ -749,21 +764,21 @@ void DrawEditParameter()
 		case 52:
 			DrawMenuTitle("Programme");
 			pxs.setFont(ElectroluxSansRegular36a);
-			DrawTextAligment( 20, 100, 100, 100, "ON",  _onoffSet.parameter,0,0,  MAIN_COLOR, BG_COLOR );
-			DrawTextAligment(200, 100, 100, 100,"OFF", !_onoffSet.parameter,0,0,  MAIN_COLOR, BG_COLOR );				
+			DrawTextAligment(20, 100, 100, 100,"ON", _onoffSet.parameter,0,0,  _onoffSet.parameter ? GREEN_COLOR : MAIN_COLOR, _onoffSet.parameter ? MAIN_COLOR : BG_COLOR );
+			DrawTextAligment(200, 100, 100, 100,"OFF", !_onoffSet.parameter,0,0, _onoffSet.parameter ? MAIN_COLOR : GREEN_COLOR, _onoffSet.parameter ? BG_COLOR : MAIN_COLOR );		
 			break;
 		case 31:
 		case 43:
 		case 422:
-			pxs.setFont(ElectroluxSansRegular36a);	
-			DrawTextAligment( 20, 70, 100, 100,  "ON",  _onoffSet.parameter, _onoffSet.current,0, MAIN_COLOR, BG_COLOR );
-			DrawTextAligment(200, 70, 100, 100, "OFF", !_onoffSet.parameter,!_onoffSet.current,0, MAIN_COLOR, BG_COLOR );				
+			pxs.setFont(ElectroluxSansRegular36a);
+			DrawTextAligment( 20, 70, 100, 100,  "ON", _onoffSet.parameter,_onoffSet.current,0,  _onoffSet.parameter ? GREEN_COLOR : MAIN_COLOR, _onoffSet.parameter ? MAIN_COLOR : BG_COLOR );
+			DrawTextAligment(200, 70, 100, 100, "OFF", !_onoffSet.parameter,!_onoffSet.current,0, _onoffSet.parameter ? MAIN_COLOR : GREEN_COLOR, _onoffSet.parameter ? BG_COLOR : MAIN_COLOR );		
 			break;
 		case 22:
 		case 421:
 			pxs.setFont(ElectroluxSansRegular36a);
-			DrawTextAligment( 20, 60, 120, 120, "50%",  _onoffSet.parameter,0,0, MAIN_COLOR, BG_COLOR );
-			DrawTextAligment(180, 60, 120, 120,"100%", !_onoffSet.parameter,0,0, MAIN_COLOR, BG_COLOR );
+			DrawTextAligment(20, 60, 120, 120,"50%", _onoffSet.parameter,0,0,  _onoffSet.parameter ? GREEN_COLOR : MAIN_COLOR, _onoffSet.parameter ? MAIN_COLOR : BG_COLOR );
+			DrawTextAligment(180, 60, 120, 120,"100%", !_onoffSet.parameter,0,0, _onoffSet.parameter ? MAIN_COLOR : GREEN_COLOR, _onoffSet.parameter ? BG_COLOR : MAIN_COLOR );	
 			break;
 		case 32:
 			DrawTimeEdit();
@@ -787,8 +802,8 @@ void DrawEditParameter()
 			}
 			
 			pxs.setFont(ElectroluxSansRegular24a);
-			DrawTextSelected(80, 240 - pxs.getTextLineHeight() - 45, "Yes", _onoffSet.parameter, false, 5, 15);
-			DrawTextSelected(210, 240 - pxs.getTextLineHeight() - 45, "No", !_onoffSet.parameter, false, 5, 15);			
+			DrawTextAligment(20, 115, 90, 90,"Yes", _onoffSet.parameter,0,0,  _onoffSet.parameter ? GREEN_COLOR : MAIN_COLOR, _onoffSet.parameter ? MAIN_COLOR : BG_COLOR );
+			DrawTextAligment(210, 115, 90, 90,"No", !_onoffSet.parameter,0,0, _onoffSet.parameter ? MAIN_COLOR : GREEN_COLOR, _onoffSet.parameter ? BG_COLOR : MAIN_COLOR );				
 			break;
 		case 442: // info
 			pxs.setFont(ElectroluxSansRegular24a);
@@ -911,13 +926,6 @@ void DrawEditParameter()
 
 void PrepareEditParameter()
 {
-	#ifdef DEBUG
-	printf("PrepareEditParameter %d\n", currentMenu->ID);
-	#endif
-	
-	//RTC_TimeTypeDef sTime;
-	//RTC_DateTypeDef sDate;
-
 	switch (currentMenu->ID)
 	{
 		case 11: // comform
@@ -965,6 +973,9 @@ void PrepareEditParameter()
 			_dateTime.tm_mday = bcdToDec(rtc_initpara.rtc_date);
 			_dateTime.tm_mon = bcdToDec(rtc_initpara.rtc_month);
 			_dateTime.tm_year = (bcdToDec(rtc_initpara.rtc_year)) < 19 ? 2019 : (bcdToDec(rtc_initpara.rtc_year)) + 2000;
+			_dateTime.tm_hour = bcdToDec(rtc_initpara.rtc_hour);
+			_dateTime.tm_min  = bcdToDec(rtc_initpara.rtc_minute);
+			_dateTime.tm_sec  = bcdToDec(rtc_initpara.rtc_second);
 			currentMenu->selected = 0;
 			break;
 		case 412: // set time
@@ -1042,6 +1053,7 @@ void AcceptParameter()
 				_settings.heatMode = HeatMode_Auto;
 			}
 			GoOK();
+			menu_clear_flag = 0;					   
 			break;		
 		case 31:
 			_settings.timerOn = _onoffSet.parameter;
@@ -1056,6 +1068,7 @@ void AcceptParameter()
 				InitTimer();
 		  }
 			GoOK();
+			menu_clear_flag = 0;					   
 			break;
 		case 32:
 			currentMenu->selected++;
@@ -1063,6 +1076,7 @@ void AcceptParameter()
 			{		
 				_settings.timerTime = _dateTime.tm_hour * 60 + _dateTime.tm_min;
 				timer_time_set = _settings.timerTime;
+				smooth_backlight(0);						
 				pxs.clear();
 				pxs.setColor(MAIN_COLOR);
 				pxs.fillOval(320/2 - 95/2,240/2 - 95/2, 95,95);
@@ -1074,7 +1088,9 @@ void AcceptParameter()
 				pxs.print(320 / 2 - width/2-2, 240/2 - height/2, "OK");
 				pxs.setColor(MAIN_COLOR);
 				pxs.setBackground(BG_COLOR);
+				smooth_backlight(1);						
 				delay_1ms(1000);
+				smooth_backlight(0);						
 				pxs.clear();
 				_timeoutSaveFlash = GetSystemTick();
 				idleTimeout = GetSystemTick();	
@@ -1085,6 +1101,7 @@ void AcceptParameter()
 				_settings.timerTime = _dateTime.tm_hour * 60 + _dateTime.tm_min;
 				timer_time_set = _settings.timerTime;
 				GoOK();
+				menu_clear_flag = 0;						
 				InitTimer();
 			}	
 
@@ -1092,6 +1109,7 @@ void AcceptParameter()
 		case 43:
 			_settings.soundOn = _onoffSet.parameter;
 			GoOK();
+		    menu_clear_flag = 0;						
 			break;
 		case 411: // date
 			currentMenu->selected++;
@@ -1121,6 +1139,7 @@ void AcceptParameter()
 					_dateTime.tm_mon++;
 					_dateTime.tm_year += 1900;
 				}
+				smooth_backlight(0);						
 				pxs.clear();
 				pxs.setColor(MAIN_COLOR);
 				pxs.fillOval(320/2 - 95/2,240/2 - 95/2, 95,95);
@@ -1132,7 +1151,9 @@ void AcceptParameter()
 				pxs.print(320 / 2 - width/2-2, 240/2 - height/2, "OK");
 				pxs.setColor(MAIN_COLOR);
 				pxs.setBackground(BG_COLOR);
+				smooth_backlight(1);						
 				delay_1ms(1000);
+				smooth_backlight(0);						
 				pxs.clear();
 				_timeoutSaveFlash = GetSystemTick();
 				idleTimeout = GetSystemTick();
@@ -1154,6 +1175,7 @@ void AcceptParameter()
 					rtc_init_param.rtc_year = decToBcd(_dateTime.tm_year - 100);
 					rtc_init_param.rtc_month = decToBcd(_dateTime.tm_mon + 1);
 					rtc_init_param.rtc_date = decToBcd(_dateTime.tm_mday);
+
 					//rtc_init_param.rtc_factor_asyn = 0x7FU;
 					//rtc_init_param.rtc_factor_syn = 0xFFU;
 					//rtc_initpara.rtc_display_format = RTC_24HOUR;		
@@ -1165,6 +1187,7 @@ void AcceptParameter()
 				{
 					currentMenu->selected = 0;
 				}
+				menu_clear_flag = 0;						
 			}
 			break;
 		case 412: // time
@@ -1179,6 +1202,7 @@ void AcceptParameter()
         //rtc_init_param.rtc_factor_asyn = 0x7FU;
         //rtc_init_param.rtc_factor_syn = 0xFFU;
 				rtc_init(&rtc_init_param);
+				smooth_backlight(0);						
 				pxs.clear();
 				pxs.setColor(MAIN_COLOR);
 				pxs.fillOval(320/2 - 95/2,240/2 - 95/2, 95,95);
@@ -1190,7 +1214,9 @@ void AcceptParameter()
 				pxs.print(320 / 2 - width/2-2, 240/2 - height/2, "OK");
 				pxs.setColor(MAIN_COLOR);
 				pxs.setBackground(BG_COLOR);
+				smooth_backlight(1);
 				delay_1ms(1000);
+				smooth_backlight(0);	
 				pxs.clear();
 				_timeoutSaveFlash = GetSystemTick();
 				idleTimeout = GetSystemTick();				
@@ -1205,6 +1231,7 @@ void AcceptParameter()
         //rtc_init_param.rtc_factor_syn = 0xFFU;
 				rtc_init(&rtc_init_param);
 				GoOK();				
+				menu_clear_flag = 0;								
 			}
 			break;
 		case 51: // presets
@@ -1228,6 +1255,7 @@ void AcceptParameter()
 				_settings.workMode = WorkMode_Comfort;
 			}
 			GoOK();	
+			menu_clear_flag = 0;					   
 			break;
 		case 53: // custom day
 		{
@@ -1268,12 +1296,12 @@ void AcceptParameter()
 				_stateBrightness = StateBrightness_LOW;
 			}
 			GoOK();
-					
+			menu_clear_flag = 0;					
 			break;
 		case 422:
 			_settings.displayAutoOff = _onoffSet.parameter;
 			GoOK();
-			
+			menu_clear_flag = 0;			
 			break;
 		case 441: // reset
 			if (!_onoffSet.parameter)
@@ -1287,6 +1315,7 @@ void AcceptParameter()
 				_onoffSet.current = _onoffSet.parameter = 1;
 			else if (currentMenu->selected == 2)
 			{
+				menu_clear_flag = 0;						
 				ResetAllSettings();
 				//GoOK();
 				SaveFlash();
@@ -1338,7 +1367,7 @@ void DateMinus()
 	else if (currentMenu->selected == 0)
 	{
 		_dateTime.tm_year--;
-		if (_dateTime.tm_year < 2019)
+		if (_dateTime.tm_year < 2020)
 			_dateTime.tm_year = 2099;
 	}
 	DrawEditParameter();
@@ -1367,7 +1396,7 @@ void DatePlus()
 	{
 		_dateTime.tm_year++;
 		if (_dateTime.tm_year == 2100)
-			_dateTime.tm_year = 2019;
+			_dateTime.tm_year = 2020;
 	}
 	DrawEditParameter();
 }
@@ -1444,7 +1473,7 @@ void On()
 }
 void MenuBack()
 {
-
+	menu_clear_flag = 0;
 	if (currentMenu->parent != NULL)
 	{
 		// if back in schedule to calendar on/off
@@ -1564,7 +1593,7 @@ void SetPower(int8_t value)
 			semistor_power = value*2;
 		}		
 	}
-	if(semistor_power == 20)
+	if(value == 20)
 	{
 		LL_GPIO_SetOutputPin(GPIOB, GPIO_PIN_6);
 	}
@@ -1908,6 +1937,7 @@ void DrawWifi()
 				pxs.fillRectangle(_xWifi + 6, 125, 43, 26);
 			}
 			pxs.setColor(MAIN_COLOR);
+			_blink = false;
 			return;
 		}
 	  else if (wifi_status == 1)
@@ -2148,18 +2178,20 @@ void DrawMainScreen(uint32_t updater)
 
 		
 	if ((_settings.modeOpenWindow) && (_settings.workMode != WorkMode_Off))
+	{
 		pxs.drawCompressedBitmap(22, 129, (uint8_t*)img_icon_open_png_comp);
-		
-	if (_settings.timerOn == 1)
-				pxs.drawCompressedBitmap(22, 71, (uint8_t*)img_icon_timer_png_comp);
+	}
+
 	
+	if (_settings.timerOn == 1)
+	{
+		pxs.drawCompressedBitmap(22, 71, (uint8_t*)img_icon_timer_png_comp);
+	}	
 	else if (_settings.calendarOn == 1)
 	{
-		if(_settings.workMode == WorkMode_Off)
-			pxs.drawCompressedBitmap(22, 150, (uint8_t*)img_icon_calendar_png_comp);
-		else
-			pxs.drawCompressedBitmap(22, 71, (uint8_t*)img_icon_calendar_png_comp);
+		pxs.drawCompressedBitmap(22, (_settings.workMode == WorkMode_Off ? 150 : 71) , (uint8_t*)img_icon_calendar_png_comp);
 	}
+
 
 	if(_settings.half_power)
 	{
@@ -2197,7 +2229,7 @@ void DrawMainScreen(uint32_t updater)
 				powerLevel = 5;
 			else if (power_current > 15)
 				powerLevel = 4;
-			else if (power_current >= 10)
+			else if (power_current > 10)
 				powerLevel = 3;
 			else if (power_current > 5)
 				powerLevel = 2;
@@ -2257,6 +2289,7 @@ void DrawMainScreen(uint32_t updater)
 	{
 		smooth_backlight(1);
 	}
+	
 }
 
 int8_t getModeTemperature()
@@ -2285,6 +2318,7 @@ void InitTimer()
 	if (_settings.on == 0 || (_settings.timerOn == 0 && _settings.calendarOn == 0))
 	{
 		rtc_alarm_disable();
+		delay_1ms(200);
 		return;
 	}
 	rtc_current_time_get(&rtc_initpara); 
@@ -2296,6 +2330,7 @@ void InitTimer()
 		_settings.calendarOn = 0;
 		_settings.workMode = WorkMode_Comfort;
 		rtc_alarm_disable();
+		delay_1ms(200);
 		return;
 	}	
 	
@@ -2333,6 +2368,7 @@ void InitTimer()
 		
 		//alarm_set(0);
 	}	
+	delay_1ms(200);
 }
 
 void ResetAllSettings()
@@ -2622,7 +2658,6 @@ bool keyPressed()
 	if (!_settings.blocked && _settings.on)
 	{
 
-		
 		if((_settings.displayAutoOff) && (_stateBrightness == StateBrightness_OFF))
 		{
 			if(_settings.brightness)
@@ -2637,10 +2672,18 @@ bool keyPressed()
 			nextChangeLevel = GetSystemTick();
 		}
 		pxs.displayOn();
-		if(currentMenu == NULL)
+		if((_settings.displayAutoOff) && (_stateBrightness == StateBrightness_LOW))
 		{
-
-			//smooth_backlight(1);
+			if(_settings.brightness)
+			{
+				_stateBrightness = StateBrightness_ON;
+				smooth_backlight(1);
+			}
+			else 
+			{
+				_stateBrightness = StateBrightness_LOW;
+			}
+			
 	  }
 	}
 	
@@ -2802,7 +2845,8 @@ void loop(void)
 			rtc_alarm_callback();
 		}
 
-    receive_uart_int();
+		receive_uart_int();	
+
 
 		if (_key_window.getPressed()&& !_error && ((currentMenu == NULL) && (_settings.workMode != WorkMode_Off)))
 		{
@@ -3094,7 +3138,14 @@ void loop(void)
 		if (((GetSystemTick() > nextChangeLevel) || (refresh_system)) && _settings.on)
 		{	
 
-			temp_current = getTemperature();
+			if(cutoff_ext_temp)
+			{
+				temp_current = temp_current_ext;
+			}
+			else
+			{
+				temp_current = getTemperature();
+			}
 			int8_t modeTemp = getModeTemperature();
 			power_current = _currentPower;
 		
@@ -3278,7 +3329,7 @@ void loop(void)
 						powerLevel = 5;
 					else if (power_current > 15)
 						powerLevel = 4;
-					else if (power_current >= 10)
+					else if (power_current > 10)
 						powerLevel = 3;
 					else if (power_current > 5)
 						powerLevel = 2;
@@ -3359,6 +3410,11 @@ void loop(void)
 				else
 				{
 					query_settings();
+					if(cutoff_ext_temp)
+			    {
+						cutoff_ext_temp --;
+					}				
+					
 					nextChangeLevel = GetSystemTick() + 60000;			
 				}					
 			}
@@ -3368,10 +3424,10 @@ void loop(void)
 		if (GetSystemTick() > refrash_time && _settings.on)
 		{	
 			fwdgt_counter_reload();
-						
+				
 			if (currentMenu == NULL && !_error)
 			{
-			#ifdef DEBUG	
+			  #ifdef DEBUG
 				char buffer[10];
 				pxs.setColor(BG_COLOR);
 				pxs.fillRectangle(240, 20, 75, 20);
@@ -3379,7 +3435,7 @@ void loop(void)
 				sprintf(buffer, "%d %d", getTemperature(), _currentPower);			
 				pxs.setFont(ElectroluxSansRegular20a);
 				DrawTextAligment(265, 20, 30, 20, buffer, false);	
-
+	
 				
 				#endif
 			}
@@ -3427,7 +3483,13 @@ void loop(void)
 			if (window_is_opened && !window_was_opened)
 				DrawWindowOpen();
 			else
+			{
+				if(wifi_active == GetSystemTick())
+				{
+					wifi_status = 0;
+				}
 				DrawWifi();
+			}
 		}
 	}
 }

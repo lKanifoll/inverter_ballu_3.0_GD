@@ -16,10 +16,10 @@ extern "C" {
 	
 #define VERSION_PMU "1.2"
 #define VERSION_MCU "1.0.0"
-#define VERSION "12.6.0"		
+#define VERSION "12.7.2"		
 #define MAJOR_V 12
-#define MINOR_V 6
-#define DEBUG_V 0
+#define MINOR_V 7
+#define DEBUG_V 2
 	
 #define	BALANCE_RESISTOR 		33000.0
 #define	BETA								3950.0 
